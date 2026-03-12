@@ -382,7 +382,7 @@ async function askGroq(msg) {
   return d.choices[0].message.content.trim();
 }
 
-// ── ELEVENLABS ──
+<!--// ── ELEVENLABS ──
 async function speakText(text) {
   if (!S.cfg.voice || S.isMuted) return;
   const r = await proxy({ type: 'eleven', text });
@@ -393,6 +393,19 @@ async function speakText(text) {
     S.currentAudio.onended = res;
     S.currentAudio.onerror = rej;
     S.currentAudio.play().catch(rej);
+  });
+}--> 
+
+  async function speakText(text) {
+  if (!S.cfg.voice || S.isMuted) return;
+  return new Promise((res) => {
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'az-AZ';
+    utt.rate = 0.95;
+    utt.pitch = 1.05;
+    utt.onend = res;
+    utt.onerror = res;
+    window.speechSynthesis.speak(utt);
   });
 }
 
