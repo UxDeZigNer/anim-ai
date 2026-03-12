@@ -381,21 +381,6 @@ async function askGroq(msg) {
   const d = await r.json();
   return d.choices[0].message.content.trim();
 }
-
-<!--// ── ELEVENLABS ──
-async function speakText(text) {
-  if (!S.cfg.voice || S.isMuted) return;
-  const r = await proxy({ type: 'eleven', text });
-  const blob = await r.blob();
-  const url  = URL.createObjectURL(blob);
-  await new Promise((res, rej) => {
-    S.currentAudio = new Audio(url);
-    S.currentAudio.onended = res;
-    S.currentAudio.onerror = rej;
-    S.currentAudio.play().catch(rej);
-  });
-}=> 
-
   async function speakText(text) {
   if (!S.cfg.voice || S.isMuted) return;
   return new Promise((res) => {
