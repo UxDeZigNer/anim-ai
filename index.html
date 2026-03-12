@@ -394,7 +394,7 @@ async function speakText(text) {
     S.currentAudio.onerror = rej;
     S.currentAudio.play().catch(rej);
   });
-}--> 
+}=> 
 
   async function speakText(text) {
   if (!S.cfg.voice || S.isMuted) return;
