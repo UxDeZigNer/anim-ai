@@ -40,23 +40,59 @@ export default async function handler(req, res) {
     return res.status(200).send(buf);
   }
 
-  // ── D-ID: Danışan video yarat ──
+  // ── D-ID: Şəkli yüklə, sonra video yarat ──
   if (type === 'did_create') {
-    const r = await fetch('https://api.d-id.com/talks', {
-      method:  'POST',
-      headers: { 'Authorization': `Basic ${DID_KEY}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        source_url: body.image_url,
-        script: {
-          type:     'text',
-          input:    body.text,
-          provider: { type: 'microsoft', voice_id: 'az-AZ-BabekNeural' },
-        },
-        config: { fluent: true, pad_audio: 0.5 },
-      }),
-    });
-    const data = await r.json();
-    return res.status(r.status).json(data);
+    try {
+      // 1) Base64 → Buffer
+      const dataUrl  = body.image_b64; // "data:image/jpeg;base64,..."
+      const matches  = dataUrl.match(/^data:(.+);base64,(.+)$/);
+      if (!matches) return res.status(400).json({ error: 'Invalid image format' });
+
+      const mimeType = matches[1];
+      const imgBuf   = Buffer.from(matches[2], 'base64');
+      const ext      = mimeType.includes('png') ? 'png' : 'jpg';
+
+      // 2) D-ID-ə şəkli yüklə (multipart/form-data)
+      const formData = new FormData();
+      const blob     = new Blob([imgBuf], { type: mimeType });
+      formData.append('image', blob, `photo.${ext}`);
+
+      const uploadRes = await fetch('https://api.d-id.com/images', {
+        method:  'POST',
+        headers: { 'Authorization': `Basic ${DID_KEY}` },
+        body:    formData,
+      });
+
+      let imageUrl;
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.url;
+      } else {
+        // Upload olmadısa, D-ID-in default şəklini işlət
+        imageUrl = 'https://d-id-public-bucket.s3.amazonaws.com/alice.jpg';
+      }
+
+      // 3) Talk yarat
+      const talkRes = await fetch('https://api.d-id.com/talks', {
+        method:  'POST',
+        headers: { 'Authorization': `Basic ${DID_KEY}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          source_url: imageUrl,
+          script: {
+            type:     'text',
+            input:    body.text,
+            provider: { type: 'microsoft', voice_id: 'az-AZ-BabekNeural' },
+          },
+          config: { fluent: true, pad_audio: 0.5 },
+        }),
+      });
+
+      const talkData = await talkRes.json();
+      return res.status(talkRes.status).json(talkData);
+
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   // ── D-ID: Video statusunu yoxla ──
