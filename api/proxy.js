@@ -34,45 +34,59 @@ export default async function handler(req, res) {
         voice_settings: { stability: 0.52, similarity_boost: 0.85, style: 0.3, use_speaker_boost: true },
       }),
     });
-    if (!r.ok) return res.status(r.status).json({ error: await r.text() });
+    if (!r.ok) {
+      const errText = await r.text();
+      return res.status(r.status).json({ error: errText });
+    }
     const buf = Buffer.from(await r.arrayBuffer());
     res.setHeader('Content-Type', 'audio/mpeg');
     return res.status(200).send(buf);
   }
 
-  // ── D-ID: Şəkli yüklə, sonra video yarat ──
+  // ── D-ID: Şəkli yüklə + video yarat ──
   if (type === 'did_create') {
     try {
-      // 1) Base64 → Buffer
-      const dataUrl  = body.image_b64; // "data:image/jpeg;base64,..."
-      const matches  = dataUrl.match(/^data:(.+);base64,(.+)$/);
-      if (!matches) return res.status(400).json({ error: 'Invalid image format' });
+      const dataUrl = body.image_b64;
+      const matches = dataUrl ? dataUrl.match(/^data:(.+);base64,(.+)$/) : null;
+      if (!matches) return res.status(400).json({ error: 'Invalid image_b64' });
 
       const mimeType = matches[1];
       const imgBuf   = Buffer.from(matches[2], 'base64');
       const ext      = mimeType.includes('png') ? 'png' : 'jpg';
 
-      // 2) D-ID-ə şəkli yüklə (multipart/form-data)
-      const formData = new FormData();
-      const blob     = new Blob([imgBuf], { type: mimeType });
-      formData.append('image', blob, `photo.${ext}`);
+      // Şəkli D-ID serverinə yüklə
+      const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+      const CRLF     = '\r\n';
+      const header   = Buffer.from(
+        `--${boundary}${CRLF}` +
+        `Content-Disposition: form-data; name="image"; filename="photo.${ext}"${CRLF}` +
+        `Content-Type: ${mimeType}${CRLF}${CRLF}`
+      );
+      const footer   = Buffer.from(`${CRLF}--${boundary}--${CRLF}`);
+      const multipart = Buffer.concat([header, imgBuf, footer]);
 
       const uploadRes = await fetch('https://api.d-id.com/images', {
         method:  'POST',
-        headers: { 'Authorization': `Basic ${DID_KEY}` },
-        body:    formData,
+        headers: {
+          'Authorization':  `Basic ${DID_KEY}`,
+          'Content-Type':   `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': String(multipart.length),
+        },
+        body: multipart,
       });
 
       let imageUrl;
       if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        imageUrl = uploadData.url;
+        const ud = await uploadRes.json();
+        imageUrl = ud.url;
       } else {
-        // Upload olmadısa, D-ID-in default şəklini işlət
+        const uploadErr = await uploadRes.text();
+        // fallback — D-ID-in öz nümunə şəkli
+        console.warn('D-ID upload failed:', uploadRes.status, uploadErr);
         imageUrl = 'https://d-id-public-bucket.s3.amazonaws.com/alice.jpg';
       }
 
-      // 3) Talk yarat
+      // Talk yarat
       const talkRes = await fetch('https://api.d-id.com/talks', {
         method:  'POST',
         headers: { 'Authorization': `Basic ${DID_KEY}`, 'Content-Type': 'application/json' },
@@ -87,7 +101,9 @@ export default async function handler(req, res) {
         }),
       });
 
-      const talkData = await talkRes.json();
+      const talkText = await talkRes.text();
+      let talkData;
+      try { talkData = JSON.parse(talkText); } catch { talkData = { raw: talkText }; }
       return res.status(talkRes.status).json(talkData);
 
     } catch (e) {
@@ -95,7 +111,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── D-ID: Video statusunu yoxla ──
+  // ── D-ID: Poll ──
   if (type === 'did_poll') {
     const r = await fetch(`https://api.d-id.com/talks/${body.id}`, {
       headers: { 'Authorization': `Basic ${DID_KEY}` },
@@ -104,5 +120,5 @@ export default async function handler(req, res) {
     return res.status(r.status).json(data);
   }
 
-  return res.status(400).json({ error: 'Unknown type' });
+  return res.status(400).json({ error: 'Unknown type: ' + type });
 }
