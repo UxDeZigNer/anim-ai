@@ -370,7 +370,7 @@ async function proxy(body) {
 // ── GROQ ──
 async function askGroq(msg) {
   const r = await proxy({
-    type: 'groq', model: 'llama3-8b-8192',
+    type: 'groq', model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: sys() },
       ...S.messages.slice(-10),
