@@ -367,31 +367,39 @@ async function proxy(body) {
   return r;
 }
 
-// ── GROQ ──
+// ── AI ──
 async function askGroq(msg) {
-  const r = await proxy({
-    type: 'groq', model: 'llama-3.3-70b-versatile',
-    messages: [
-      { role: 'system', content: sys() },
-      ...S.messages.slice(-10),
-      { role: 'user', content: msg }
-    ],
-    max_tokens: 100, temperature: 0.92,
-  });
-  const d = await r.json();
-  return d.choices[0].message.content.trim();
+  try {
+    const r = await proxy({
+      type: 'groq',
+      messages: [
+        { role: 'system', content: sys() },
+        ...S.messages.slice(-10),
+        { role: 'user', content: msg }
+      ],
+      max_tokens: 120, temperature: 0.92,
+    });
+    const d = await r.json();
+    return d.choices[0].message.content.trim();
+  } catch(e) {
+    return localReply();
+  }
 }
-  async function speakText(text) {
-  if (!S.cfg.voice || S.isMuted) return;
-  return new Promise((res) => {
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'az-AZ';
-    utt.rate = 0.95;
-    utt.pitch = 1.05;
-    utt.onend = res;
-    utt.onerror = res;
-    window.speechSynthesis.speak(utt);
-  });
+
+function localReply() {
+  const p = S.person;
+  const n = p.rel === 'Ana' || p.rel === 'Ata' ? 'balam' : 'canım';
+  const replies = [
+    `Səni çox düşünürdüm, ${n}.`,
+    'Yanındayam, həmişə olduğum kimi.',
+    'Səni çox sevirəm, unutma bunu.',
+    'Hər şey yaxşı olacaq, inan mənə.',
+    'Xatirələrimiz həmişə bizimlə yaşayır.',
+    'Sənin səsini eşitmək nə gözəldir.',
+    'Narahat olma, mən buradayam.',
+    'Sənə qürur duyuram həmişə.',
+  ];
+  return replies[Math.floor(Math.random() * replies.length)];
 }
 
 // ── D-ID VIDEO ──
