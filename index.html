@@ -367,24 +367,30 @@ async function proxy(body) {
   return r;
 }
 
-// ── BRAUZER TTS ──
+// ── OPENAI TTS ──
 async function speakText(text) {
   if (!S.cfg.voice || S.isMuted) return;
-  window.speechSynthesis.cancel();
-  return new Promise((res) => {
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'az-AZ';
-    utt.rate = 0.92;
-    utt.pitch = 1.1;
-    const voices = window.speechSynthesis.getVoices();
-    const az = voices.find(v => v.lang.startsWith('az'));
-    const tr = voices.find(v => v.lang.startsWith('tr'));
-    if (az) utt.voice = az;
-    else if (tr) utt.voice = tr;
-    utt.onend = res;
-    utt.onerror = res;
-    window.speechSynthesis.speak(utt);
-  });
+  try {
+    const r = await proxy({ type: 'eleven', text });
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    await new Promise((res, rej) => {
+      S.currentAudio = new Audio(url);
+      S.currentAudio.onended = res;
+      S.currentAudio.onerror = rej;
+      S.currentAudio.play().catch(rej);
+    });
+  } catch(e) {
+    window.speechSynthesis.cancel();
+    return new Response((res) => {
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'tr-TR';
+      utt.rate = 0.92;
+      utt.onend = res;
+      utt.onerror = res;
+      window.speechSynthesis.speak(utt);
+    });
+  }
 }
 
 // ── LOCAL FALLBACK ──
