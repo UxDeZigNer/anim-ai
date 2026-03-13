@@ -168,6 +168,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--deep);color:var(--cream);
 .modal-close{width:100%;padding:13px;margin-top:20px;background:transparent;border:1px solid rgba(138,121,104,.3);color:var(--soft);cursor:pointer;font-size:13px;transition:all .2s;}
 .modal-close:hover{border-color:var(--gold);color:var(--gold);}
 
+/* Text input */
+.text-input-row{display:flex;gap:10px;width:100%;max-width:380px;margin-top:16px;}
+.text-in{flex:1;padding:13px 16px;background:rgba(255,255,255,.07);border:1px solid rgba(201,169,110,.25);color:var(--cream);font-family:"DM Sans",sans-serif;font-size:14px;outline:none;border-radius:2px;transition:border-color .2s;}
+.text-in:focus{border-color:var(--gold);}
+.text-in::placeholder{color:var(--muted);}
+.text-send{width:48px;height:48px;background:var(--gold);color:var(--deep);border:none;cursor:pointer;font-size:18px;flex-shrink:0;transition:all .2s;border-radius:2px;}
+.text-send:hover{background:var(--gold-l);}
+.text-send:disabled{opacity:.4;cursor:not-allowed;}
+
 /* Toast */
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--brown);color:var(--cream);padding:12px 22px;font-size:13px;border-left:3px solid var(--gold);box-shadow:0 4px 20px var(--sh);z-index:200;animation:up .3s ease;border-radius:2px;max-width:90vw;text-align:center;}
 
@@ -287,6 +296,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--deep);color:var(--cream);
       <button class="ctrl ctrl-side ctrl-end" onclick="endCall()">📵</button>
     </div>
     <div class="mic-hint" id="micHint">Danışmaq üçün 🎙️ basın &nbsp;·&nbsp; Boşluq da işləyir</div>
+    <div class="text-input-row">
+      <input type="text" class="text-in" id="textIn" placeholder="Yazın...">
+      <button class="text-send" onclick="sendText()">➤</button>
+    </div>
   </div>
 
   <div class="transcript" id="transcript"></div>
@@ -317,7 +330,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--deep);color:var(--cream);
 </div>
 
 <script>
-const PROXY = '/api/proxy';
+const PROXY = 'https://green-leaf-7ce0.designermahirvelizade.workers.dev';
 const VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
 
 const S = {
@@ -367,11 +380,16 @@ async function proxy(body) {
   return r;
 }
 
-// ── OPENAI TTS ──
+// ── BRAUZER TTS ──
 async function speakText(text) {
   if (!S.cfg.voice || S.isMuted) return;
   try {
-    const r = await proxy({ type: 'eleven', text });
+    const r = await fetch(PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'eleven', text }),
+    });
+    if (!r.ok) throw new Error('TTS xeta');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     await new Promise((res, rej) => {
@@ -382,7 +400,7 @@ async function speakText(text) {
     });
   } catch(e) {
     window.speechSynthesis.cancel();
-    return new Response((res) => {
+    await new Promise((res) => {
       const utt = new SpeechSynthesisUtterance(text);
       utt.lang = 'tr-TR';
       utt.rate = 0.92;
@@ -631,6 +649,25 @@ document.addEventListener('keydown', e => {
       && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA') {
     e.preventDefault(); toggleMic();
   }
+});
+
+// ── TEXT INPUT ──
+function sendText() {
+  const inp = document.getElementById("textIn");
+  const text = inp.value.trim();
+  if (!text || S.isAiSpeaking) return;
+  inp.value = "";
+  S.messages.push({ role: "user", content: text });
+  if (S.cfg.sub) addTr("user", text);
+  setSt("Cavab hazırlanir...");
+  aiTurn(text);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const inp = document.getElementById("textIn");
+  if (inp) inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); sendText(); }
+  });
 });
 </script>
 </body>
