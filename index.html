@@ -317,7 +317,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--deep);color:var(--cream);
 </div>
 
 <script>
-const PROXY = 'https://green-leaf-7ce0.designermahirvelizade.workers.dev';
+const PROXY = '/api/proxy';
 const VOICE_ID = '21m00Tcm4TlvDq8ikWAM';
 
 const S = {
@@ -367,6 +367,45 @@ async function proxy(body) {
   return r;
 }
 
+// ── BRAUZER TTS ──
+async function speakText(text) {
+  if (!S.cfg.voice || S.isMuted) return;
+  window.speechSynthesis.cancel();
+  return new Promise((res) => {
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'az-AZ';
+    utt.rate = 0.92;
+    utt.pitch = 1.1;
+    const voices = window.speechSynthesis.getVoices();
+    const az = voices.find(v => v.lang.startsWith('az'));
+    const tr = voices.find(v => v.lang.startsWith('tr'));
+    if (az) utt.voice = az;
+    else if (tr) utt.voice = tr;
+    utt.onend = res;
+    utt.onerror = res;
+    window.speechSynthesis.speak(utt);
+  });
+}
+
+// ── LOCAL FALLBACK ──
+function localReply() {
+  const p = S.person;
+  const n = ['Ana','Ata','Büyükana','Büyükbaba'].includes(p.rel) ? 'balam' : 'canım';
+  const replies = [
+    `Səni çox düşünürdüm, ${n}.`,
+    'Yanındayam, həmişə olduğum kimi.',
+    'Səni çox sevirəm, unutma bunu.',
+    'Hər şey yaxşı olacaq, inan mənə.',
+    'Xatirələrimiz həmişə bizimlə yaşayır.',
+    'Sənin səsini eşitmək nə gözəldir.',
+    'Narahat olma, mən buradayam.',
+    'Sənə qürur duyuram həmişə.',
+    'Məni heç yaddan çıxartma.',
+    'Səninlə olmaq nə gözəl hissdir.',
+  ];
+  return replies[Math.floor(Math.random() * replies.length)];
+}
+
 // ── AI ──
 async function askGroq(msg) {
   try {
@@ -384,22 +423,6 @@ async function askGroq(msg) {
   } catch(e) {
     return localReply();
   }
-}
-
-function localReply() {
-  const p = S.person;
-  const n = p.rel === 'Ana' || p.rel === 'Ata' ? 'balam' : 'canım';
-  const replies = [
-    `Səni çox düşünürdüm, ${n}.`,
-    'Yanındayam, həmişə olduğum kimi.',
-    'Səni çox sevirəm, unutma bunu.',
-    'Hər şey yaxşı olacaq, inan mənə.',
-    'Xatirələrimiz həmişə bizimlə yaşayır.',
-    'Sənin səsini eşitmək nə gözəldir.',
-    'Narahat olma, mən buradayam.',
-    'Sənə qürur duyuram həmişə.',
-  ];
-  return replies[Math.floor(Math.random() * replies.length)];
 }
 
 // ── D-ID VIDEO ──
